@@ -1,45 +1,36 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
 import os
 import requests
+from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # <-- allows frontend to talk to backend
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    data = request.json
-    if not WEBHOOK_URL:
-        return "Webhook URL not configured", 500
-
-    embed = {
-        "embeds": [
-            {
-                "title": f"{data.get('type', 'UNKNOWN').upper()} Message",
-                "color": 16711680 if data.get("type") in ["user", "user_file"] else 65280,
-                "fields": [
-                    {"name": "Content", "value": data.get("content", "N/A")},
-                    {"name": "Info1", "value": data.get("ip", "unknown")},
-                    {"name": "Info2", "value": data.get("location", "unknown")},
-                    {"name": "Info3", "value": data.get("userAgent", "unknown")},
-                    {"name": "Time", "value": data.get("time", "unknown")}
-                ]
-            }
-        ]
-    }
-    r = requests.post(WEBHOOK_URL, json=embed)
-    return jsonify({"status": "sent", "code": r.status_code})
-
-@app.route("/log", methods=["POST"])
-def log():
-    print("[LOG]", request.json)
-    return jsonify({"status": "logged"})
-
-@app.route("/", methods=["GET"])
-def health():
+@app.route("/")
+def home():
     return "Flask service online."
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5050)
+@app.route("/webhook", methods=["POST"])
+def handle_webhook():
+    data = request.json
+    if WEBHOOK_URL:
+        requests.post(WEBHOOK_URL, json={
+            "embeds": [{
+                "title": f"{data.get('type', 'Message').upper()}",
+                "fields": [
+                    {"name": "Content", "value": data.get("content", "")},
+                    {"name": "Location", "value": data.get("location", "Unknown")},
+                    {"name": "User Agent", "value": data.get("userAgent", "Unknown")},
+                    {"name": "Time", "value": data.get("time", "")}
+                ]
+            }]
+        })
+    return jsonify({"status": "sent"})
+
+@app.route("/log", methods=["POST"])
+def log_message():
+    data = request.json
+    print(f"[LOG] {data.get('ip')} -> {data.get('content')}")
+    return jsonify({"status": "logged"})
