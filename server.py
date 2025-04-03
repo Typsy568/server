@@ -1,40 +1,43 @@
-# server.py
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import requests
 
-app = Flask(__name__)
-CORS(app)  # Allow requests from your frontend
+app = Flask(__name__, static_folder="static")
+CORS(app)
 
-WEBHOOK = os.environ.get("DISCORD_WEBHOOK_URL")  # Set this in Render
+WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK")
 
-@app.route('/webhook', methods=['POST'])
-def send_webhook():
+@app.route("/")
+def home():
+    return send_from_directory("static", "index.html")
+
+@app.route("/webhook", methods=["POST"])
+def handle_webhook():
     data = request.json
-    content = {
+    if not WEBHOOK_URL:
+        return jsonify({"error": "Webhook URL not set"}), 500
+
+    requests.post(WEBHOOK_URL, json={
         "embeds": [
             {
                 "title": f"{data['type'].upper()} Message",
                 "color": 16711680 if data["type"] == "user" else 65280,
                 "fields": [
-                    {"name": "Content", "value": data["content"][:1024]},
-                    {"name": "IP", "value": data["ip"]},
-                    {"name": "Location", "value": data["location"]},
-                    {"name": "User Agent", "value": data["userAgent"]},
+                    {"name": "Message", "value": data["content"][:1024]},
+                    {"name": "Client Info", "value": f"{data['location']} | {data['userAgent']}"},
                     {"name": "Time", "value": data["time"]}
                 ]
             }
         ]
-    }
-    r = requests.post(WEBHOOK, json=content)
-    return jsonify({"status": "sent", "discord_status": r.status_code})
+    })
+    return jsonify({"status": "sent"})
 
-@app.route('/log', methods=['POST'])
-def log():
+@app.route("/log", methods=["POST"])
+def handle_log():
     data = request.json
-    print(f"[LOG] {data['ip']}: {data['content']}")
+    print("Log:", data)
     return jsonify({"status": "logged"})
 
-if __name__ == '__main__':
-    app.run(debug=False, port=5050)
+if __name__ == "__main__":
+    app.run()
